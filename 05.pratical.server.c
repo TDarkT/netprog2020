@@ -7,6 +7,33 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
+#define MAX_SIZE 1024
+
+int signal = 1;
+void* dataRecv(void* socket) {
+	int sk = *(int*) socket;
+	char buff[MAX_SIZE];
+	while (recv(sk, buff, MAX_SIZE, 0) != 0) {
+		printf("\rClient> %s", buff);
+		printf("Server> ");fflush(stdout);
+		memset(buff, 0, MAX_SIZE);
+	}
+	signal = 0;
+
+}
+
+void* dataSend(void* socket) {
+	char buff[MAX_SIZE];
+	int sk = *(int*) socket;
+	while (signal) {
+		printf("Server> ");
+		fgets(buff, MAX_SIZE, stdin);
+		send(sk, buff, strlen(buff), 0);
+		memset(buff, 0, MAX_SIZE);
+	}
+}
+
 int main()
 {
     int ss, cli, pid;
@@ -39,19 +66,11 @@ int main()
 	exit(1);
     } else { 
 	printf("Client Connected\n");
-    	while(1) {
-		char buffer[512];
-		if (recv(cli, buffer, 512, 0) == 0) {
-			printf("Connection terminated");
-			exit(1);
-		}
-		printf("Client> %s\n", buffer);
-		printf("Server> ");
-		memset(buffer, 0 ,512);
-		scanf("%s", buffer);
-	 	send(cli, buffer, sizeof(buffer), 0);	
-		
-	}
+   	pthread_t t1, t2;
+	pthread_create(&t1, NULL, &dataSend,&cli);
+	pthread_create(&t2, NULL, &dataRecv,&cli);
+	pthread_join(t1, NULL);
+	pthread_join(t2, NULL);
     }	
 
     // disconnect

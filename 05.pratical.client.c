@@ -7,6 +7,33 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <string.h>
+#include <pthread.h>
+#define MAX_SIZE 2048
+
+int signal = 1;
+
+void *dataSend(void* socket) {
+	int sk = *(int*) socket;
+	char buff[MAX_SIZE];
+	while (signal) {
+		printf("Client> ");
+		fgets(buff, MAX_SIZE, stdin);
+		send(sk, buff, strlen(buff), 0);
+		memset(buff, 0, MAX_SIZE);
+	}
+}
+
+void *dataRecv(void* socket) {
+	char buff[MAX_SIZE];
+	int sk = *(int*) socket;
+	while (recv(sk, buff, MAX_SIZE, 0) != 0) {
+		printf("\rServer> %s", buff);
+		printf("Client> ");fflush(stdout);
+		memset(buff, 0 , MAX_SIZE);
+	} 
+	signal = 0;
+}
+
 int main(int argc, char **argv) {
 	struct sockaddr_in ad;
 	struct hostent *host;
@@ -29,20 +56,13 @@ int main(int argc, char **argv) {
 
 	if (connect(serv, (struct sockaddr *) &ad, sizeof(ad)) == 0 ) {
 		printf("Connection established\n");
-		while(1) {
-			char buffer[512];
-			printf("Client> ");
-			fflush(stdin);
-			scanf("%s",buffer);
-			send(serv, buffer, sizeof(buffer), 0);
-			memset(buffer, 0, 512);
-			if (recv(serv, buffer, 512, 0) == 0) {
-				printf("Connection terminated");
-				exit(1);
-			}
-			printf("Server> %s\n",buffer);			
-			
-		}
+		pthread_t t1, t2;
+		void *args[] = {&serv};
+		pthread_create(&t1, NULL,&dataSend, &serv);
+		pthread_create(&t2, NULL,&dataRecv, &serv);
+		pthread_join(t1, NULL);
+		pthread_join(t2, NULL);
+
 	} else {
 		printf("Connection error\n");
 		exit(1);
